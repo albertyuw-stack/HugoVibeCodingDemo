@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>30-Year Home Price Projection (Zip: 94043)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f7;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      padding: 32px 32px 24px;
+      width: 100%;
+      max-width: 900px;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #1d1d1f;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .chart-wrap { position: relative; height: 480px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>30-Year Home Price Projection (Zip: 94043)</h1>
+    <div class="chart-wrap">
+      <canvas id="priceChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    // Historical data
+    const yearsHist = [2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026];
+    const pricesHist = [1.51,1.64,2.19,1.95,1.87,2.09,2.55,2.11,2.47,2.45,2.46];
+
+    // Projection
+    const currentPrice = 2.46;
+    const yearsProj = Array.from({length: 31}, (_, i) => 2026 + i); // 2026–2056
+    const nYears     = yearsProj.map(y => y - 2026);
+    const worstCase  = nYears.map(n => +(currentPrice * Math.pow(1.025, n)).toFixed(4));
+    const midCase    = nYears.map(n => +(currentPrice * Math.pow(1.050, n)).toFixed(4));
+    const bestCase   = nYears.map(n => +(currentPrice * Math.pow(1.065, n)).toFixed(4));
+
+    // Merge all x labels (historical + projection, deduplicated & sorted)
+    const allYears = [...new Set([...yearsHist, ...yearsProj])].sort((a,b)=>a-b);
+
+    // Helper: sparse dataset — only populate values for years in a given set
+    function sparse(years, values, allYears) {
+      return allYears.map(y => {
+        const i = years.indexOf(y);
+        return i !== -1 ? values[i] : null;
+      });
+    }
+
+    const histData  = sparse(yearsHist, pricesHist, allYears);
+    const worstData = sparse(yearsProj,  worstCase,  allYears);
+    const midData   = sparse(yearsProj,  midCase,    allYears);
+    const bestData  = sparse(yearsProj,  bestCase,   allYears);
+
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: allYears,
+        datasets: [
+          {
+            label: 'Historical Zestimate',
+            data: histData,
+            borderColor: '#000',
+            backgroundColor: '#000',
+            pointRadius: 5,
+            pointHoverRadius: 7,
+            borderWidth: 2.5,
+            tension: 0,
+            spanGaps: false,
+          },
+          {
+            label: 'Best Case (6.5% CAGR)',
+            data: bestData,
+            borderColor: '#22a745',
+            backgroundColor: 'transparent',
+            borderDash: [8, 4],
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0,
+            spanGaps: false,
+          },
+          {
+            label: 'Middle Case (5.0% CAGR)',
+            data: midData,
+            borderColor: '#0d6efd',
+            backgroundColor: 'transparent',
+            borderDash: [8, 4],
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0,
+            spanGaps: false,
+          },
+          {
+            label: 'Worst Case (2.5% CAGR)',
+            data: worstData,
+            borderColor: '#dc3545',
+            backgroundColor: 'transparent',
+            borderDash: [8, 4],
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0,
+            spanGaps: false,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { font: { size: 13 }, boxWidth: 32, padding: 16 },
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}M`,
+            },
+          },
+          // Vertical annotation line at 2026 via custom plugin
+          forecastLine: true,
+        },
+        scales: {
+          x: {
+            title: { display: true, text: 'Year', font: { size: 13 } },
+            grid: { color: 'rgba(0,0,0,0.07)', lineWidth: 1 },
+            ticks: { maxTicksLimit: 20 },
+          },
+          y: {
+            title: { display: true, text: 'Home Value ($ Millions)', font: { size: 13 } },
+            grid: { color: 'rgba(0,0,0,0.07)', lineWidth: 1 },
+            ticks: {
+              callback: v => '$' + v.toFixed(1) + 'M',
+            },
+          },
+        },
+      },
+      plugins: [{
+        id: 'forecastLine',
+        afterDraw(chart) {
+          const { ctx, scales: { x, y } } = chart;
+          const xPos = x.getPixelForValue(2026);
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(xPos, y.top);
+          ctx.lineTo(xPos, y.bottom);
+          ctx.strokeStyle = 'rgba(100,100,100,0.45)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([5, 4]);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = 'rgba(100,100,100,0.7)';
+          ctx.font = '11px system-ui, sans-serif';
+          ctx.fillText('Forecast Begins', xPos + 6, y.top + 60);
+          ctx.restore();
+        },
+      }],
+    });
+  </script>
+</body>
+</html>
